@@ -1,48 +1,102 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
-import { categories, defaultProducts, money, readStore, writeStore } from "./data";
-import { getCurrentUser, getUsers, login, logout, signup } from "./auth";
+import React, { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { login, signup } from "./auth";
 
 export default function AuthForm({ mode, onAuth }) {
   const nav = useNavigate();
+  const location = useLocation();
   const [role, setRole] = useState("user");
   const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
-  const [message, setMessage] = useState("");
+  const [notice, setNotice] = useState(null);
+  const [loading, setLoading] = useState(false);
   const isSignup = mode === "signup";
-  function change(e) { setForm({ ...form, [e.target.name]: e.target.value }); }
+
+  useEffect(() => {
+    const flash = location.state;
+    if (!isSignup && flash?.notice) {
+      setNotice({ text: flash.notice, type: "success" });
+      setForm({ name: "", email: flash.email || "", password: "", confirmPassword: "" });
+    } else {
+      setNotice(null);
+      setForm(prev => ({ ...prev, password: "", confirmPassword: "" }));
+    }
+  }, [isSignup, location.state]);
+
+  function change(e) {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  }
+
+  function selectRole(nextRole) {
+    setRole(nextRole);
+    setNotice(null);
+  }
+
   function submit(e) {
     e.preventDefault();
-    if (isSignup) {
-      const result = signup(form);
-      setMessage(result.message);
-      if (result.ok) nav("/login");
-    } else {
-      const result = login({ ...form, role });
-      setMessage(result.message);
-      if (result.ok) {
-        onAuth(result.user);
-        nav(result.user.role === "admin" ? "/admin" : "/");
+    setLoading(true);
+    setNotice(null);
+
+    try {
+      if (isSignup) {
+        const result = signup(form);
+        if (result.ok) {
+          nav("/login", { state: { notice: result.message, email: form.email.trim().toLowerCase() } });
+        } else {
+          setNotice({ text: result.message, type: "error" });
+        }
+      } else {
+        const result = login({ ...form, role });
+        setNotice({ text: result.message, type: result.ok ? "success" : "error" });
+        if (result.ok) {
+          onAuth(result.user);
+          nav(result.user.role === "admin" ? "/admin" : "/");
+        }
       }
+    } catch (err) {
+      setNotice({ text: "An unexpected error occurred. Please try again.", type: "error" });
+    } finally {
+      setLoading(false);
     }
   }
-  return <main className="auth-wrap">
-    <form className="auth-card" onSubmit={submit}>
-      <div className="auth-logo">🌿 KLU <span>Fresh</span></div>
-      <h1>{isSignup ? "Create your account" : "Welcome back"}</h1>
-      <p>{isSignup ? "Sign up to shop fresh essentials." : "Login to continue to KLU Fresh."}</p>
-      {!isSignup && <div className="role-switch">
-        <button type="button" className={role === "user" ? "selected" : ""} onClick={() => setRole("user")}>Customer</button>
-        <button type="button" className={role === "admin" ? "selected" : ""} onClick={() => setRole("admin")}>Admin</button>
-      </div>}
-      {isSignup && <input name="name" placeholder="Full name" value={form.name} onChange={change} required />}
-      <input name="email" type="email" placeholder="Email address" value={form.email} onChange={change} required />
-      <input name="password" type="password" placeholder="Password" value={form.password} onChange={change} required />
-      {isSignup && <input name="confirmPassword" type="password" placeholder="Confirm password" value={form.confirmPassword} onChange={change} required />}
-      <button className="primary-btn full" type="submit">{isSignup ? "Create account" : "Login"}</button>
-      {message && <p className="notice">{message}</p>}
-      <p className="auth-bottom">{isSignup ? "Already registered?" : "New to KLU Fresh?"} <Link to={isSignup ? "/login" : "/signup"}>{isSignup ? "Login" : "Create an account"}</Link></p>
-      {!isSignup && role === "admin" && <small>Demo: admin@klufresh.com / admin123</small>}
-    </form>
-  </main>;
-}
 
+  return (
+    <main className="auth-wrap">
+      <form className="auth-card" onSubmit={submit}>
+        <Link className="auth-logo" to="/">🌿 KLU <span>Fresh</span></Link>
+        <h1>{isSignup ? "Create your account" : "Welcome back"}</h1>
+        <p>{isSignup ? "Sign up to shop fresh essentials." : "Login to continue to KLU Fresh."}</p>
+        {!isSignup && (
+          <div className="role-switch">
+            <button type="button" className={role === "user" ? "selected" : ""} onClick={() => selectRole("user")}>
+              Customer
+            </button>
+            <button type="button" className={role === "admin" ? "selected" : ""} onClick={() => selectRole("admin")}>
+              Admin
+            </button>
+          </div>
+        )}
+        {isSignup && <input name="name" placeholder="Full name" value={form.name} onChange={change} required />}
+        <input name="email" type="email" placeholder="Email address" value={form.email} onChange={change} required />
+        <input name="password" type="password" placeholder="Password" value={form.password} onChange={change} required />
+        {isSignup && <input name="confirmPassword" type="password" placeholder="Confirm password" value={form.confirmPassword} onChange={change} required />}
+        <button className="primary-btn full" type="submit" disabled={loading}>
+          {loading ? "Processing..." : isSignup ? "Create account" : "Login"}
+        </button>
+        {notice && (
+          <p className={`notice ${notice.type === "success" ? "notice-success" : ""}`}>{notice.text}</p>
+        )}
+        <p className="auth-bottom">
+          {isSignup ? "Already registered?" : "New to KLU Fresh?"}{" "}
+          <Link to={isSignup ? "/login" : "/signup"}>{isSignup ? "Login" : "Create an account"}</Link>
+        </p>
+        {!isSignup && (
+          <small>
+            {role === "admin"
+              ? "Demo: admin@klufresh.com / admin123 or admin123@klufresh.in / admin11"
+              : "Demo: customer@klufresh.com / demo1234"}
+          </small>
+        )}
+      </form>
+    </main>
+  );
+}

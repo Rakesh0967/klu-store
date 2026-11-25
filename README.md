@@ -1,47 +1,34 @@
 # KLU Fresh — React + Vite
 
-A client-side grocery shopping demo with customer and admin modules.
+A client-side grocery shopping web application with customer storefront, admin dashboard, and browser `localStorage` persistence.
 
-## Requirements
-- Node.js 18 or later
-- npm
+## Features
+- **LocalStorage Persistence**:
+  - Stores customer accounts (`grocery_users`), admin accounts (`grocery_admins`), active session (`grocery_current_user`), products (`grocery_products`), orders (`grocery_orders`), cart (`klu_cart`), and wishlist (`klu_wishlist`).
+- **Customer Storefront**:
+  - Product catalog with search, category filtering, and sorting
+  - Cart, wishlist, delivery slot selection, checkout, and order history tracking
+- **Admin Dashboard**:
+  - Live revenue, total orders, product catalog size, registered users, and low-stock alerts
+  - Product CRUD (create, edit, delete, +5 quick stock boost)
+  - Order status tracking and registered user directory
 
 ## Run locally
 ```bash
 npm install
 npm run dev
 ```
-Open the local URL shown by Vite (normally http://localhost:5173).
-
-## Demo admin login
-- Email: `admin@klufresh.com`
-- Password: `admin123`
-
-A second admin account is also available:
-- Email: `admin123@klufresh.in`
-- Password: `admin11`
-
-Customers can create an account using Sign up.
-
-## Features
-- Customer signup/login and admin login using localStorage
-- Role-based admin dashboard
-- Product search, category filter and sorting
-- Cart, wishlist, checkout and order history
-- Admin product create/edit/delete and stock updates
-- Admin order status management and registered user list
-- Responsive layout
 
 ## Deploy to Vercel
-1. Push this project to a GitHub repository.
-2. Sign in to Vercel and choose **Add New → Project**.
-3. Import the GitHub repository.
-4. Framework preset: **Vite**.
-5. Build command: `npm run build`.
-6. Output directory: `dist`.
-7. Click **Deploy**.
+- Framework preset: **Vite**
+- Build command: `npm run build`
+- Output directory: `dist`
+- `vercel.json` is configured for SPA routing (`/index.html`).
 
-`vercel.json` is included for SPA route fallback.
-
-## Important demo limitation
-This project uses browser localStorage. Data is stored only in the current browser/device and is not shared between customers/admins on different devices. Client-side demo credentials and localStorage are not secure for a real production store. For production, use a backend API, database, and server-side authentication.
+## Demo Logins
+- **Admin Accounts**:
+  - `admin@klufresh.com` (Password: `admin123`)
+  - `admin123@klufresh.in` (Password: `admin11`)
+- **Customer Account**:
+  - Use **Sign up** to create an account, or log in with:
+  - `customer@klufresh.com` (Password: `demo1234`)
