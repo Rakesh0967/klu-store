@@ -40,6 +40,7 @@ Customers can create an account using Sign up.
 5. Build command: `npm run build`.
 6. Output directory: `dist`.
 7. Click **Deploy**.
+8.https://klu-store-unv3.vercel.app/
 
 `vercel.json` is included for SPA route fallback.
 
