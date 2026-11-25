@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Header, ProductCard, ProductThumb, statusTone, useStored } from "./Shared";
-import { categories, categoryMeta, money } from "./data";
+import { categories, categoryMeta, money, CHECKOUT_COUPONS, computeCouponSavings } from "./data";
 import { logout } from "./auth";
 
 const CART = "klu_cart";
@@ -27,6 +27,9 @@ export default function User({ user, products, setProducts, orders, setOrders })
   });
   const [notice, setNotice] = useState("");
   const [showOrders, setShowOrders] = useState(false);
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponMsg, setCouponMsg] = useState(null);
 
   useEffect(() => {
     if (!notice) return;
@@ -109,8 +112,41 @@ export default function User({ user, products, setProducts, orders, setOrders })
   const subtotal = cart.reduce((sum, x) => sum + x.price * x.qty, 0);
   const discount = subtotal >= 500 ? Math.round(subtotal * 0.1) : 0;
   const total = subtotal - discount;
+  const couponDiscount = computeCouponSavings(appliedCoupon, subtotal, total);
+  const checkoutTotal = Math.max(0, total - couponDiscount);
   const remainingForDiscount = Math.max(0, 500 - subtotal);
   const discountProgress = Math.min(100, Math.round((subtotal / 500) * 100));
+
+  // Auto-remove coupon if cart drops below minimum
+  useEffect(() => {
+    if (appliedCoupon && subtotal < appliedCoupon.minOrder) {
+      setAppliedCoupon(null);
+      setCouponMsg({ type: "error", text: `${appliedCoupon.code} removed (requires minimum ₹${appliedCoupon.minOrder}).` });
+    }
+  }, [appliedCoupon, subtotal]);
+
+  function applyCouponCode(codeArg) {
+    const code = (codeArg || couponInput).trim().toUpperCase();
+    if (!code) return;
+    const found = CHECKOUT_COUPONS[code];
+    if (!found) {
+      setCouponMsg({ type: "error", text: `"${code}" is not a valid coupon code.` });
+      return;
+    }
+    if (subtotal < found.minOrder) {
+      setCouponMsg({ type: "error", text: `${code} requires a minimum subtotal of ₹${found.minOrder}.` });
+      return;
+    }
+    setAppliedCoupon(found);
+    setCouponInput(code);
+    setCouponMsg({ type: "success", text: `✅ ${code} applied — saving ${money(computeCouponSavings(found, subtotal, total))}!` });
+  }
+
+  function removeCoupon() {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponMsg(null);
+  }
 
   function placeOrder(e) {
     e.preventDefault();
@@ -133,7 +169,9 @@ export default function User({ user, products, setProducts, orders, setOrders })
       items: cart.map(x => ({ id: x.id, name: x.name, qty: x.qty, price: x.price, emoji: x.emoji })),
       subtotal,
       discount,
-      total,
+      couponCode: appliedCoupon?.code || null,
+      couponDiscount,
+      total: checkoutTotal,
       status: "Placed",
       createdAt: new Date().toISOString()
     };
@@ -148,6 +186,7 @@ export default function User({ user, products, setProducts, orders, setOrders })
     setCheckout(false);
     setShowCart(false);
     setNotice(`Order ${order.id} placed successfully!`);
+    removeCoupon();
   }
 
   function clearFilters() {
@@ -670,8 +709,40 @@ export default function User({ user, products, setProducts, orders, setOrders })
               <p>
                 Order Discount (10% on ₹500+) <b className="savings">-{money(discount)}</b>
               </p>
+
+              {/* ── Coupon Code ── */}
+              <div className="coupon-wrap">
+                {appliedCoupon ? (
+                  <div className="coupon-applied">
+                    <span>🏷️ <b>{appliedCoupon.code}</b> — {appliedCoupon.label}</span>
+                    <button type="button" className="coupon-remove" onClick={removeCoupon}>✕</button>
+                  </div>
+                ) : (
+                  <div className="coupon-row">
+                    <input
+                      className="coupon-input"
+                      placeholder="Enter coupon code"
+                      value={couponInput}
+                      onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponMsg(null); }}
+                      onKeyDown={e => e.key === "Enter" && (e.preventDefault(), applyCouponCode())}
+                    />
+                    <button type="button" className="coupon-btn" onClick={() => applyCouponCode()} disabled={!couponInput.trim()}>
+                      Apply
+                    </button>
+                  </div>
+                )}
+                {couponMsg && (
+                  <p className={`coupon-msg ${couponMsg.type === "error" ? "coupon-err" : "coupon-ok"}`}>
+                    {couponMsg.text}
+                  </p>
+                )}
+              </div>
+
+              {couponDiscount > 0 && (
+                <p>Coupon ({appliedCoupon.code}) <b className="savings">-{money(couponDiscount)}</b></p>
+              )}
               <h3>
-                Total <b>{money(total)}</b>
+                Total <b>{money(checkoutTotal)}</b>
               </h3>
               <button
                 type="button"
@@ -731,7 +802,56 @@ export default function User({ user, products, setProducts, orders, setOrders })
                 ))}
               </select>
             </label>
-            <h3>Order total: {money(total)}</h3>
+            {/* Coupon Code Section */}
+            <div className="checkout-coupon-box">
+              <div className="coupon-row">
+                <input
+                  type="text"
+                  placeholder="Enter coupon code (e.g. KLU10)"
+                  value={couponInput}
+                  onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponMsg(null); }}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); applyCouponCode(); } }}
+                />
+                {appliedCoupon ? (
+                  <button type="button" className="outline-btn" onClick={removeCoupon}>Remove</button>
+                ) : (
+                  <button type="button" className="outline-btn" onClick={() => applyCouponCode()}>Apply</button>
+                )}
+              </div>
+              {couponMsg && (
+                <p className={`coupon-msg ${couponMsg.type === "error" ? "coupon-err" : "coupon-ok"}`}>
+                  {couponMsg.text}
+                </p>
+              )}
+              <div className="coupon-chips">
+                {Object.values(CHECKOUT_COUPONS).map(c => {
+                  const eligible = subtotal >= c.minOrder;
+                  const active = appliedCoupon?.code === c.code;
+                  return (
+                    <button
+                      key={c.code}
+                      type="button"
+                      disabled={!eligible}
+                      className={`coupon-chip${active ? " coupon-chip-active" : ""}`}
+                      onClick={() => applyCouponCode(c.code)}
+                      title={c.label}
+                    >
+                      <b>{c.code}</b>
+                      <span>{c.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Order Summary */}
+            <div className="checkout-summary">
+              <p>Subtotal <span>{money(subtotal)}</span></p>
+              {discount > 0 && <p>Order Discount (10% on ₹500+) <span className="savings">-{money(discount)}</span></p>}
+              {couponDiscount > 0 && <p>Coupon ({appliedCoupon.code}) <span className="savings">-{money(couponDiscount)}</span></p>}
+              <h3>Order total: <span>{money(checkoutTotal)}</span></h3>
+            </div>
+
             <button className="primary-btn full" type="submit">
               Place order
             </button>

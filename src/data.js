@@ -172,3 +172,21 @@ export const readStore = (key, fallback) => {
 
 export const writeStore = (key, value) => localStorage.setItem(key, JSON.stringify(value));
 export const money = value => `₹${Number(value || 0).toLocaleString("en-IN")}`;
+
+// ── Coupon Codes ──────────────────────────────────────────────────────────────
+export const CHECKOUT_COUPONS = {
+  KLU10:    { code: "KLU10",    type: "percent", value: 10, maxDiscount: 150, minOrder: 0,   label: "10% OFF (up to ₹150)" },
+  FRESH50:  { code: "FRESH50",  type: "flat",    value: 50,                   minOrder: 250,  label: "₹50 OFF on ₹250+" },
+  WELCOME75:{ code: "WELCOME75",type: "flat",    value: 75,                   minOrder: 400,  label: "₹75 OFF on ₹400+" },
+  CAMPUS100:{ code: "CAMPUS100",type: "flat",    value: 100,                  minOrder: 600,  label: "₹100 OFF on ₹600+" },
+  HOSTEL20: { code: "HOSTEL20", type: "percent", value: 20, maxDiscount: 250, minOrder: 800,  label: "20% OFF on ₹800+ (max ₹250)" },
+};
+
+export function computeCouponSavings(coupon, subtotal, afterBulk) {
+  if (!coupon || subtotal < coupon.minOrder || afterBulk <= 0) return 0;
+  if (coupon.type === "percent") {
+    const raw = Math.round(afterBulk * (coupon.value / 100));
+    return Math.min(afterBulk, coupon.maxDiscount || raw, raw);
+  }
+  return Math.min(afterBulk, coupon.value);
+}
